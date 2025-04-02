@@ -1,0 +1,17 @@
+<?php
+
+namespace DummyNamespace;
+
+use NeedBrainz\TypesenseAggregator\TypesenseAggregator;
+
+class DummyClass extends TypesenseAggregator
+{
+    /**
+     * The names of the models that should be aggregated.
+     *
+     * @var string[]
+     */
+    protected $models = [
+        // ..
+    ];
+}
