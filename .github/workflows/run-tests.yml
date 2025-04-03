@@ -16,7 +16,8 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest]
+        typesense-version: [0.22.0, 0.23.1]
         php: [8.4, 8.3]
         laravel: [12.*, 11.*, 10.*]
         stability: [prefer-lowest, prefer-stable]
@@ -41,6 +42,16 @@ jobs:
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv, imagick, fileinfo
           coverage: none
 
+      - name: Start Typesense
+        uses: jirevwe/typesense-github-action@v1.0.1
+        with:
+          typesense-version: ${{ matrix.typesense-version }}
+          typesense-api-key: api-key
+          typesense-port: 8108
+
+      - name: Curl Typesense
+        run: sleep 10 && curl http://localhost:8108/health
+
       - name: Setup problem matchers
         run: |
           echo "::add-matcher::${{ runner.tool_cache }}/php.json"
@@ -56,3 +67,7 @@ jobs:
 
       - name: Execute tests
         run: vendor/bin/pest --ci
+        env:
+          SCOUT_DRIVER: typesense
+          TYPESENSE_HOST: "localhost"
+          TYPESENSE_API_KEY: "api-key"

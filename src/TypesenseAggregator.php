@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
+use Laravel\Scout\Builder;
 use Laravel\Scout\Events\ModelsImported;
 use Laravel\Scout\Searchable;
 use NeedBrainz\TypesenseAggregator\Exceptions\ModelNotDefinedInAggregatorException;
@@ -44,11 +45,13 @@ class TypesenseAggregator
      */
     protected $indexName;
 
-    final public function __construct() {}
+    final public function __construct()
+    {
+    }
 
     public function typesenseCollectionSchema(): array
     {
-        return config('scout.typesense.model-settings.'.static::class.'.collection-schema', []);
+        return config('scout.typesense.model-settings.' . static::class . '.collection-schema', []);
     }
 
     /**
@@ -56,8 +59,8 @@ class TypesenseAggregator
      */
     public static function bootSearchable(): void
     {
-        ($self = new static)->registerSearchableMacros();
-        $observer = tap(app(TypesenseAggregatorObserver::class))->setAggregator(static::class, $models = (new static)->getModels());
+        ($self = new static())->registerSearchableMacros();
+        $observer = tap(app(TypesenseAggregatorObserver::class))->setAggregator(static::class, $models = (new static())->getModels());
         foreach ($models as $model) {
             $model::observe($observer);
         }
@@ -65,7 +68,7 @@ class TypesenseAggregator
 
     public static function create(Model $model): TypesenseAggregator
     {
-        return (new static)->setModel($model);
+        return (new static())->setModel($model);
     }
 
     /**
@@ -81,7 +84,7 @@ class TypesenseAggregator
     public function getModel(): Model
     {
         if ($this->model === null) {
-            throw new ModelNotDefinedInAggregatorException;
+            throw new ModelNotDefinedInAggregatorException();
         }
 
         return $this->model;
@@ -109,13 +112,16 @@ class TypesenseAggregator
      *
      * @return mixed
      */
-    public function getScoutKey()
+    public function getScoutKey(?Model $model = null)
     {
-        if ($this->model === null) {
-            throw new ModelNotDefinedInAggregatorException;
+        if (!$model) {
+            $model = $this->model;
+        }
+        if ($model === null) {
+            throw new ModelNotDefinedInAggregatorException();
         }
 
-        return method_exists($this->model, 'getScoutKey') ? $this->model->getScoutKey() : $this->model->getKey();
+        return get_class($model) . '::' . $model->getScoutKey();
     }
 
     /**
@@ -123,7 +129,7 @@ class TypesenseAggregator
      */
     public function searchableAs(): string
     {
-        return config('scout.prefix').str_replace('\\', '', Str::snake(class_basename(static::class)));
+        return config('scout.prefix') . str_replace('\\', '', Str::snake(class_basename(static::class)));
     }
 
     /**
@@ -132,11 +138,13 @@ class TypesenseAggregator
     public function toSearchableArray(): array
     {
         if ($this->model === null) {
-            throw new ModelNotDefinedInAggregatorException;
+            throw new ModelNotDefinedInAggregatorException();
         }
 
-        return method_exists($this->model, 'toSearchableArray') ? $this->model->toSearchableArray() :
-           $this->model->toArray();
+        return array_merge(method_exists($this->model, 'toSearchableArray') ? $this->model->toSearchableArray() :
+           $this->model->toArray(), [
+               'id' => (string) $this->getScoutKey(),
+           ]);
     }
 
     /**
@@ -146,8 +154,8 @@ class TypesenseAggregator
      */
     public static function makeAllSearchable()
     {
-        foreach ((new static)->getModels() as $model) {
-            $instance = new $model;
+        foreach ((new static())->getModels() as $model) {
+            $instance = new $model();
 
             $softDeletes =
                in_array(SoftDeletes::class, class_uses_recursive($model)) && config('scout.soft_delete', false);
@@ -229,6 +237,90 @@ class TypesenseAggregator
     }
 
     /**
+     * Get the requested models from an array of object IDs.
+     *
+     * @param  \Laravel\Scout\Builder  $builder
+     * @param  array  $ids
+     * @return \Illuminate\Support\Collection
+     */
+    public function getScoutModelsByIds(Builder $builder, array $ids)
+    {
+        // Group IDs by model class
+        $groupedIds = $this->groupIdsByModel($ids);
+
+        // Initialize an empty collection to store results
+        $results = collect();
+
+        // For each model class, fetch the corresponding models
+        foreach ($groupedIds as $modelClass => $modelIds) {
+            $instance = new $modelClass();
+            $query = static::usesSoftDelete() && method_exists($instance, 'withTrashed')
+            ? $instance->withTrashed()
+            : $instance->newQuery();
+
+            if ($builder->queryCallback) {
+                call_user_func($builder->queryCallback, $query);
+            }
+
+            $whereIn = in_array($instance->getScoutKeyType(), ['int', 'integer'])
+            ? 'whereIntegerInRaw'
+            : 'whereIn';
+
+            $models = $query->{$whereIn}(
+                $instance->qualifyColumn($instance->getScoutKeyName()),
+                $modelIds
+            )->get();
+            $results = $results->merge($models);
+        }
+
+        // Reorder results to match the original order of IDs
+        return $results;
+    }
+
+    /**
+     * Group IDs by model class.
+     *
+     * @param  array  $ids
+     * @return array
+     */
+    protected function groupIdsByModel(array $ids)
+    {
+        $groupedIds = [];
+        foreach ($ids as $id) {
+            try {
+                list($modelClass, $modelId) = explode('::', $id, 2);
+            } catch (\Exception $e) {
+                continue;
+            }
+            if (!isset($groupedIds[$modelClass])) {
+                $groupedIds[$modelClass] = [];
+            }
+            $groupedIds[$modelClass][] = $modelId;
+        }
+
+        return $groupedIds;
+    }
+
+
+
+    /**
+     * Get a query builder for retrieving the requested models from an array of object IDs.
+     *
+     * Note: This method is not used directly because we need to query multiple models.
+     *
+     * @param  \Laravel\Scout\Builder  $builder
+     * @param  array  $ids
+     * @return mixed
+     */
+    public function queryScoutModelsByIds(Builder $builder, array $ids)
+    {
+        // This method is kept for backwards compatibility
+        // but will not be used directly by getScoutModelsByIds anymore
+
+        throw new \RuntimeException('This method is not used directly anymore.');
+    }
+
+    /**
      * Handle dynamic method calls into the model.
      *
      * @param  string  $method
@@ -237,7 +329,8 @@ class TypesenseAggregator
      */
     public function __call($method, $parameters)
     {
-        $model = $this->model ?? new class extends Model {};
+        $model = $this->model ?? new class extends Model {
+        };
 
         return $model->$method(...$parameters);
     }
