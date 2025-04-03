@@ -1,3 +1,5 @@
+.env
+
 # Composer Related
 composer.lock
 /vendor

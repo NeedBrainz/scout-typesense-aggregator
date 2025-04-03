@@ -2,11 +2,11 @@
 
 namespace NeedBrainz\TypesenseAggregator;
 
-use function get_class;
-
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Queue\SerializesAndRestoresModelIdentifiers;
 use Illuminate\Support\Collection;
+
+use function get_class;
 
 /**
  * @method static void searchable()
@@ -24,14 +24,12 @@ class TypesenseAggregatorCollection extends Collection
 
     /**
      * Make all the models in this collection unsearchable.
-     *
-     * @return void
      */
     public function unsearchable(): void
     {
         $aggregator = get_class($this->first());
 
-        (new $aggregator())->queueRemoveFromSearch($this);
+        (new $aggregator)->queueRemoveFromSearch($this);
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace NeedBrainz\TypesenseAggregator\Tests;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Laravel\Scout\ScoutServiceProvider;
 use NeedBrainz\TypesenseAggregator\TypesenseAggregatorServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 
@@ -21,17 +22,13 @@ class TestCase extends Orchestra
     {
         return [
             TypesenseAggregatorServiceProvider::class,
+            ScoutServiceProvider::class,
         ];
     }
 
     public function getEnvironmentSetUp($app)
     {
         config()->set('database.default', 'testing');
-
-        /*
-         foreach (\Illuminate\Support\Facades\File::allFiles(__DIR__ . '/database/migrations') as $migration) {
-            (include $migration->getRealPath())->up();
-         }
-         */
+        config()->set('scout.driver', 'typesense');
     }
 }
