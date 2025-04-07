@@ -2,8 +2,8 @@
 
 namespace NeedBrainz\TypesenseAggregator\Engines;
 
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\LazyCollection;
 use Laravel\Scout\Builder;
 use Laravel\Scout\Engines\TypesenseEngine as BaseTypesenseEngine;
@@ -70,7 +70,7 @@ class TypesenseEngine extends BaseTypesenseEngine
         }
 
         foreach ($models as $modelClass => $modelKeys) {
-            $model = new $modelClass();
+            $model = new $modelClass;
 
             if (in_array(Searchable::class, class_uses_recursive($model), true)) {
                 if (! empty($models = $model->getScoutModelsByIds($builder, $modelKeys))) {
