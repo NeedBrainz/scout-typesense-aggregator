@@ -11,6 +11,7 @@ class BaseModel extends Model
 
     protected $fillable = [
         'name',
+        'order',
     ];
 
     public function toSearchableArray()
@@ -18,6 +19,7 @@ class BaseModel extends Model
         return [
             'id' => (string) $this->id,
             'name' => $this->name,
+            'order' => $this->order,
         ];
     }
 }

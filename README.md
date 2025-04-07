@@ -5,15 +5,7 @@
 [![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/needbrainz/scout-typesense-aggregator/fix-php-code-style-issues.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/needbrainz/scout-typesense-aggregator/actions?query=workflow%3A"Fix+PHP+code+style+issues"+branch%3Amain)
 [![Total Downloads](https://img.shields.io/packagist/dt/needbrainz/scout-typesense-aggregator.svg?style=flat-square)](https://packagist.org/packages/needbrainz/scout-typesense-aggregator)
 
-This is where your description should go. Limit it to a paragraph or two. Consider adding a small example.
-
-## Support us
-
-[<img src="https://github-ads.s3.eu-central-1.amazonaws.com/scout-typesense-aggregator.jpg?t=1" width="419px" />](https://spatie.be/github-ad-click/scout-typesense-aggregator)
-
-We invest a lot of resources into creating [best in class open source packages](https://spatie.be/open-source). You can support us by [buying one of our paid products](https://spatie.be/open-source/support-us).
-
-We highly appreciate you sending us a postcard from your hometown, mentioning which of our package(s) you are using. You'll find our address on [our contact page](https://spatie.be/about-us). We publish all received postcards on [our virtual postcard wall](https://spatie.be/open-source/postcards).
+Laravel Scout Aggregator for Typesense extends Laravel Scout with support for aggregated search across multiple models using Typesense. Based on Algolia's Scout Extended package, it adapts and extends the aggregator functionality for the open-source Typesense engine.
 
 ## Installation
 
@@ -23,37 +15,107 @@ You can install the package via composer:
 composer require needbrainz/scout-typesense-aggregator
 ```
 
-You can publish and run the migrations with:
-
-```bash
-php artisan vendor:publish --tag="scout-typesense-aggregator-migrations"
-php artisan migrate
-```
-
-You can publish the config file with:
-
-```bash
-php artisan vendor:publish --tag="scout-typesense-aggregator-config"
-```
-
-This is the contents of the published config file:
-
-```php
-return [
-];
-```
-
-Optionally, you can publish the views using
-
-```bash
-php artisan vendor:publish --tag="scout-typesense-aggregator-views"
-```
-
 ## Usage
 
+To create a new aggregator, you can use the `make:aggregator` command:
+
+```bash
+php artisan make:typesense-aggregator MyAggregator
+```
+
+
 ```php
-$typesenseAggregator = new NeedBrainz\TypesenseAggregator();
-echo $typesenseAggregator->echoPhrase('Hello, NeedBrainz!');
+<?php
+
+namespace App\Search;
+
+use NeedBrainz\TypesenseAggregator\TypesenseAggregator;
+
+class MyAggregator extends TypesenseAggregator
+{
+    /**
+     * The names of the models that should be aggregated.
+     *
+     * @var string[]
+     */
+    protected $models = [
+        App\Models\MyModel::class,
+        App\Models\MyOtherModel::class,
+    ];
+}
+```
+Then configure the aggregator settings in your `config/scout.php` file:
+
+```php
+'typesense' => [
+    'model-settings' => [
+        MyAggregator::class => [
+           'collection-schema' => [
+                'fields' => [
+                    [
+                        'name' => 'id',
+                        'type' => 'string',
+                    ],
+                    // Your aggregated fields
+                    [
+                        'name' => 'name',
+                        'type' => 'string',
+                    ],
+                    [
+                        'name' => 'description',
+                        'type' => 'string',
+                    ],
+                    [
+                        'name' => 'created_at',
+                        'type' => 'int64',
+                    ],
+                ],
+                'default_sorting_field' => 'created_at',
+           ],
+           'search-parameters' => [
+                'query_by' => 'name,description',
+           ]
+        ],
+    ]
+```
+
+Register your Aggregator in an appropriate service provider, such as `App\Providers\AppServiceProvider`:
+
+```php
+use App\Search\MyAggregator;
+
+public function boot(): void
+{
+    MyAggregator::bootSearchable();
+}
+```
+
+By default the Aggregator will merge the models toSearchableArrray and set the custom id coming from the Aggregator `getScoutKey($model)` which will create an id in the format `ModelClassName::ModelScoutKey`. This format can then be reverted with the `extractScoutKey($key)` for models retrieve. So if you change the syntax, don't forget to override the `getScoutKey` and `extractScoutKey` methods in your Aggregator class.
+
+If the structure of the models is different, you can override the `toSearchableArray` method in your Aggregator class to customize the merging of the models.
+
+```php
+public function toSearchableArray(): array
+{
+    $array = [
+        'id' => (string )$this->getScoutKey(),
+        'created_at' => $this->model->created_at->timestamp,
+        // default empty values
+        'name' => '',
+        'description' => '',
+    ];
+
+    // Customize the merging of the models here
+    if ($this->model instanceof MyModel) {
+        $array['name'] = (string) $this->model->name;
+        $array['description'] = (string) $this->model->description;
+    } elseif ($this->model instanceof MyOtherModel) {
+        $array['name'] = (string) $this->model->title;
+        $array['description'] = (string) $this->model->summary;
+    }
+
+    return $array;
+}
 ```
 
 ## Testing

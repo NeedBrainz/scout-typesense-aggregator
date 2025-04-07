@@ -110,18 +110,41 @@ class TypesenseAggregator
     /**
      * Get the value used to index the model.
      *
-     * @return mixed
+     * @return string
      */
     public function getScoutKey(?Model $model = null)
     {
-        if (!$model) {
+        if (! $model) {
             $model = $this->model;
         }
         if ($model === null) {
             throw new ModelNotDefinedInAggregatorException();
         }
+        if (method_exists($model, 'getScoutKey')) {
+            $key = $model->getScoutKey();
+        } else {
+            $key = $model->getKey();
+        }
 
-        return get_class($model) . '::' . $model->getScoutKey();
+        return get_class($model) . '::' . $key;
+    }
+
+    /**
+     * Return the model class and ID from the scout key.
+     *
+     * @return array
+     */
+    public function extractScoutKey(string $key)
+    {
+        $parts = explode('::', $key, 2);
+        if (count($parts) !== 2) {
+            throw new \RuntimeException('Invalid scout key format');
+        }
+
+        return [
+            'model' => $parts[0],
+            'id' => $parts[1],
+        ];
     }
 
     /**
@@ -234,90 +257,6 @@ class TypesenseAggregator
         }
 
         $models->first()->searchableUsing()->delete($models);
-    }
-
-    /**
-     * Get the requested models from an array of object IDs.
-     *
-     * @param  \Laravel\Scout\Builder  $builder
-     * @param  array  $ids
-     * @return \Illuminate\Support\Collection
-     */
-    public function getScoutModelsByIds(Builder $builder, array $ids)
-    {
-        // Group IDs by model class
-        $groupedIds = $this->groupIdsByModel($ids);
-
-        // Initialize an empty collection to store results
-        $results = collect();
-
-        // For each model class, fetch the corresponding models
-        foreach ($groupedIds as $modelClass => $modelIds) {
-            $instance = new $modelClass();
-            $query = static::usesSoftDelete() && method_exists($instance, 'withTrashed')
-            ? $instance->withTrashed()
-            : $instance->newQuery();
-
-            if ($builder->queryCallback) {
-                call_user_func($builder->queryCallback, $query);
-            }
-
-            $whereIn = in_array($instance->getScoutKeyType(), ['int', 'integer'])
-            ? 'whereIntegerInRaw'
-            : 'whereIn';
-
-            $models = $query->{$whereIn}(
-                $instance->qualifyColumn($instance->getScoutKeyName()),
-                $modelIds
-            )->get();
-            $results = $results->merge($models);
-        }
-
-        // Reorder results to match the original order of IDs
-        return $results;
-    }
-
-    /**
-     * Group IDs by model class.
-     *
-     * @param  array  $ids
-     * @return array
-     */
-    protected function groupIdsByModel(array $ids)
-    {
-        $groupedIds = [];
-        foreach ($ids as $id) {
-            try {
-                list($modelClass, $modelId) = explode('::', $id, 2);
-            } catch (\Exception $e) {
-                continue;
-            }
-            if (!isset($groupedIds[$modelClass])) {
-                $groupedIds[$modelClass] = [];
-            }
-            $groupedIds[$modelClass][] = $modelId;
-        }
-
-        return $groupedIds;
-    }
-
-
-
-    /**
-     * Get a query builder for retrieving the requested models from an array of object IDs.
-     *
-     * Note: This method is not used directly because we need to query multiple models.
-     *
-     * @param  \Laravel\Scout\Builder  $builder
-     * @param  array  $ids
-     * @return mixed
-     */
-    public function queryScoutModelsByIds(Builder $builder, array $ids)
-    {
-        // This method is kept for backwards compatibility
-        // but will not be used directly by getScoutModelsByIds anymore
-
-        throw new \RuntimeException('This method is not used directly anymore.');
     }
 
     /**
