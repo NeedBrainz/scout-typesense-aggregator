@@ -44,11 +44,13 @@ class TypesenseAggregator
      */
     protected $indexName;
 
-    final public function __construct() {}
+    final public function __construct()
+    {
+    }
 
     public function typesenseCollectionSchema(): array
     {
-        return config('scout.typesense.model-settings.'.static::class.'.collection-schema', []);
+        return config('scout.typesense.model-settings.' . static::class . '.collection-schema', []);
     }
 
     /**
@@ -56,8 +58,8 @@ class TypesenseAggregator
      */
     public static function bootSearchable(): void
     {
-        ($self = new static)->registerSearchableMacros();
-        $observer = tap(app(TypesenseAggregatorObserver::class))->setAggregator(static::class, $models = (new static)->getModels());
+        ($self = new static())->registerSearchableMacros();
+        $observer = tap(app(TypesenseAggregatorObserver::class))->setAggregator(static::class, $models = (new static())->getModels());
         foreach ($models as $model) {
             $model::observe($observer);
         }
@@ -65,7 +67,7 @@ class TypesenseAggregator
 
     public static function create(Model $model): TypesenseAggregator
     {
-        return (new static)->setModel($model);
+        return (new static())->setModel($model);
     }
 
     /**
@@ -81,7 +83,7 @@ class TypesenseAggregator
     public function getModel(): Model
     {
         if ($this->model === null) {
-            throw new ModelNotDefinedInAggregatorException;
+            throw new ModelNotDefinedInAggregatorException();
         }
 
         return $this->model;
@@ -115,7 +117,7 @@ class TypesenseAggregator
             $model = $this->model;
         }
         if ($model === null) {
-            throw new ModelNotDefinedInAggregatorException;
+            throw new ModelNotDefinedInAggregatorException();
         }
         if (method_exists($model, 'getScoutKey')) {
             $key = $model->getScoutKey();
@@ -123,7 +125,7 @@ class TypesenseAggregator
             $key = $model->getKey();
         }
 
-        return get_class($model).'::'.$key;
+        return get_class($model) . '::' . $key;
     }
 
     /**
@@ -149,7 +151,7 @@ class TypesenseAggregator
      */
     public function searchableAs(): string
     {
-        return config('scout.prefix').str_replace('\\', '', Str::snake(class_basename(static::class)));
+        return config('scout.prefix') . str_replace('\\', '', Str::snake(class_basename(static::class)));
     }
 
     /**
@@ -158,7 +160,7 @@ class TypesenseAggregator
     public function toSearchableArray(): array
     {
         if ($this->model === null) {
-            throw new ModelNotDefinedInAggregatorException;
+            throw new ModelNotDefinedInAggregatorException();
         }
 
         return array_merge(method_exists($this->model, 'toSearchableArray') ? $this->model->toSearchableArray() :
@@ -174,8 +176,8 @@ class TypesenseAggregator
      */
     public static function makeAllSearchable()
     {
-        foreach ((new static)->getModels() as $model) {
-            $instance = new $model;
+        foreach ((new static())->getModels() as $model) {
+            $instance = new $model();
 
             $softDeletes =
                in_array(SoftDeletes::class, class_uses_recursive($model)) && config('scout.soft_delete', false);
@@ -265,7 +267,8 @@ class TypesenseAggregator
      */
     public function __call($method, $parameters)
     {
-        $model = $this->model ?? new class extends Model {};
+        $model = $this->model ?? new class extends Model {
+        };
 
         return $model->$method(...$parameters);
     }

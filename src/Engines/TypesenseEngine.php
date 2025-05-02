@@ -3,11 +3,13 @@
 namespace NeedBrainz\TypesenseAggregator\Engines;
 
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\LazyCollection;
 use Laravel\Scout\Builder;
 use Laravel\Scout\Engines\TypesenseEngine as BaseTypesenseEngine;
 use Laravel\Scout\Searchable;
+use NeedBrainz\TypesenseAggregator\Tests\TestSupport\TestModels\Aggregator;
 use NeedBrainz\TypesenseAggregator\TypesenseAggregator;
 
 class TypesenseEngine extends BaseTypesenseEngine
@@ -34,6 +36,25 @@ class TypesenseEngine extends BaseTypesenseEngine
         } else {
             return parent::lazyMap($builder, $results, $model);
         }
+    }
+
+    /**
+     * Remove the given model from the index.
+     *
+     * @param  \Illuminate\Database\Eloquent\Collection  $models
+     * @return void
+     *
+     * @throws \Http\Client\Exception
+     * @throws \Typesense\Exceptions\TypesenseClientError
+     */
+    public function delete($models)
+    {
+        $models->each(function (Model|TypesenseAggregator $model) {
+            $this->deleteDocument(
+                $this->getOrCreateCollectionFromModel($model),
+                $model->getScoutKey()
+            );
+        });
     }
 
     protected function fromAggregation(Builder $builder, array $results, $aggregator): Collection
@@ -70,7 +91,7 @@ class TypesenseEngine extends BaseTypesenseEngine
         }
 
         foreach ($models as $modelClass => $modelKeys) {
-            $model = new $modelClass;
+            $model = new $modelClass();
 
             if (in_array(Searchable::class, class_uses_recursive($model), true)) {
                 if (! empty($models = $model->getScoutModelsByIds($builder, $modelKeys))) {
