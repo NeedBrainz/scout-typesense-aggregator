@@ -9,7 +9,6 @@ use Illuminate\Support\LazyCollection;
 use Laravel\Scout\Builder;
 use Laravel\Scout\Engines\TypesenseEngine as BaseTypesenseEngine;
 use Laravel\Scout\Searchable;
-use NeedBrainz\TypesenseAggregator\Tests\TestSupport\TestModels\Aggregator;
 use NeedBrainz\TypesenseAggregator\TypesenseAggregator;
 
 class TypesenseEngine extends BaseTypesenseEngine
@@ -91,7 +90,7 @@ class TypesenseEngine extends BaseTypesenseEngine
         }
 
         foreach ($models as $modelClass => $modelKeys) {
-            $model = new $modelClass();
+            $model = new $modelClass;
 
             if (in_array(Searchable::class, class_uses_recursive($model), true)) {
                 if (! empty($models = $model->getScoutModelsByIds($builder, $modelKeys))) {
