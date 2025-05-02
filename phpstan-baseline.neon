@@ -1,3 +1,4 @@
 parameters:
     ignoreErrors:
         - '#Call to an undefined method Illuminate\\Database\\Eloquent\\Model::searchableUsing\(\)#'
+        - '#Call to an undefined method Illuminate\\Database\\Eloquent\\Model::getScoutKey\(\).#'
