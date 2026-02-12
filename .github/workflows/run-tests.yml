@@ -31,18 +31,20 @@ jobs:
 
     name: P${{ matrix.php }} - L${{ matrix.laravel }} - ${{ matrix.stability }} - ${{ matrix.os }}
 
-    services:
-      typesense:
-        image: typesense/typesense:${{ matrix.typesense-version }}
-        ports:
-          - 8108:8108
-        env:
-          TYPESENSE_DATA_DIR: /tmp/typesense-data
-          TYPESENSE_API_KEY: api-key
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+
+      - name: Start Typesense
+        run: |
+          docker run -d \
+          -p 8108:8108 \
+          --name typesense \
+          -v /tmp/typesense-data:/data \
+          typesense/typesense:${{ matrix.typesense-version }} \
+          --api-key=api-key \
+          --data-dir=/data \
+          --enable-cors
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -51,8 +53,24 @@ jobs:
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv, imagick, fileinfo
           coverage: none
 
-      - name: Verify Typesense
-        run: sleep 10 && curl http://localhost:8108/health
+      - name: Wait for Typesense to be healthy
+        shell: bash
+        run: |
+          start_time=$(date +%s)
+          timeout=30
+          counter=0
+          echo "Waiting for Typesense to be healthy..."
+          until curl -s http://localhost:8108/health | grep -q '"ok":true'; do
+            if [ $counter -eq $timeout ]; then
+              echo "Timed out waiting for Typesense to be healthy"
+              exit 1
+            fi
+            sleep 1
+            counter=$((counter + 1))
+          done
+          end_time=$(date +%s)
+          elapsed=$((end_time - start_time))
+          echo "Typesense healthcheck elapsed: ${elapsed}s"
 
       - name: Setup problem matchers
         run: |
