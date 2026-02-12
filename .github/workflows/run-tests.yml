@@ -17,7 +17,7 @@ jobs:
       fail-fast: true
       matrix:
         os: [ubuntu-latest]
-        typesense-version: ['26.0', '28.0']
+        typesense-version: ['28.0', '30.1']
         php: [8.4, 8.3]
         laravel: [12.*, 11.*, 10.*]
         stability: [prefer-stable]
@@ -31,6 +31,15 @@ jobs:
 
     name: P${{ matrix.php }} - L${{ matrix.laravel }} - ${{ matrix.stability }} - ${{ matrix.os }}
 
+    services:
+      typesense:
+        image: typesense/typesense:${{ matrix.typesense-version }}
+        ports:
+          - 8108:8108
+        env:
+          TYPESENSE_DATA_DIR: /tmp/typesense-data
+          TYPESENSE_API_KEY: api-key
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -42,14 +51,7 @@ jobs:
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv, imagick, fileinfo
           coverage: none
 
-      - name: Start Typesense
-        uses: jirevwe/typesense-github-action@v1.0.1
-        with:
-          typesense-version: ${{ matrix.typesense-version }}
-          typesense-api-key: api-key
-          typesense-port: 8108
-
-      - name: Curl Typesense
+      - name: Verify Typesense
         run: sleep 10 && curl http://localhost:8108/health
 
       - name: Setup problem matchers
