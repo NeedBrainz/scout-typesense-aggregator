@@ -2,6 +2,10 @@
 
 All notable changes to `scout-typesense-aggregator` will be documented in this file.
 
+## 1.0.3 - 2026-02-12
+
+Bump dependencies: add Laravel 13, Scout 11 support; widen typesense-php to ^6.0
+
 ## 1.0.2 - 2026-02-12
 
 Bump composer.json to add support for typesense-php v6
